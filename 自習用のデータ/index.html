@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pandasコード問題</title>
+<style>
+:root{--bg:#eef2f5;--panel:#fff;--ink:#1b2a35;--sub:#5a6b78;--line:#cfd8df;--accent:#1d6a8c;--ok:#2b7a4b;--ng:#b0412d;--code:#14222c}
+@media (prefers-color-scheme:dark){:root{--bg:#10181e;--panel:#18232b;--ink:#e6eef3;--sub:#9ab0be;--line:#2c3c47;--accent:#59b2d6;--ok:#58c184;--ng:#f0866f;--code:#0b1218}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.7;padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{max-width:760px;margin:0 auto}
+h1{font-size:1.4rem;margin:8px 0 4px}
+.sub{color:var(--sub);margin:0 0 16px}
+#status{padding:10px 14px;border-left:4px solid var(--accent);background:var(--panel);margin-bottom:16px}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:20px}
+.q h2{font-size:1.05rem;margin:0 0 8px}
+pre.data{max-width:100%;background:var(--code);color:#dbe8ef;padding:10px 12px;border-radius:4px;overflow-x:auto;font-size:.85rem;margin:8px 0}
+textarea{width:100%;min-height:110px;font:16px/1.5 ui-monospace,Menlo,monospace;background:var(--code);color:#dbe8ef;border:1px solid var(--line);border-radius:4px;padding:10px;resize:vertical;tab-size:4}
+textarea:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:600;background:var(--accent);color:#fff;border:0;border-radius:4px;padding:10px 20px;margin-top:8px;min-height:44px}
+button:disabled{opacity:.5}
+@media (prefers-color-scheme:dark){button{color:#08141b}}
+.hint{margin-top:10px;color:var(--sub)}.hint summary{min-height:32px;cursor:pointer}.hint p{margin:4px 0}
+#score{margin-top:12px}.big{font-size:2.2rem;font-weight:700;color:var(--accent)}.detail{white-space:pre-wrap}
+.res{margin-top:10px;font-weight:600}
+.res.ok{color:var(--ok)}.res.ng{color:var(--ng)}
+.out{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:.85rem;color:var(--sub);margin-top:4px}
+#total{font-size:1.1rem;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<h1>pandasコード問題</h1>
+<p class="sub">コードを書いて「採点」を押してください。答えは変数 <code>ans</code> に入れます。<br>
+  がんばってね。(^ω^)b<br>
+  ps.先生は病院の帰りに自宅の扉前でブラックアウトして、３分ほど気絶して唇から大量の血液を流しました(ﾆｯｺﾘ)<br>
+  みんなもインフルにはマジで気を付けてくださいね。
+</p>
+<div id="status">Pythonを準備しています(初回は少し時間がかかります)…</div>
+<pre class="data" id="data">データを準備しています…</pre>
+<div id="quiz"></div>
+<section class="q" id="final"><h2>最終結果</h2><p>すべて解き終わったら押してください。</p><button id="finish" disabled>点数を表示</button><div id="score"></div></section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const SETUP = `
+df = pd.DataFrame({
+  "名前": ["青木","伊藤","上田","江口","小川","加藤","木村","工藤","斎藤","佐々木"],
+  "クラス": ["A","A","B","B","A","B","A","B","A","B"],
+  "性別": ["男","女","男","女","男","女","女","男","女","男"],
+  "数学": [82, 65, 91, 48, 67, 79, 58, 88, 94, 67],
+  "英語": [70, None, 88, 55, 64, None, 62, 90, 85, 59],
+  "国語": [75, 80, 70, None, 68, 85, 71, 66, 92, 60],
+})
+`;
+// 問題はここを編集して増やせます。ans に答えを入れさせ、solution の結果と比較します。
+const Q = (title, text, solution, hint) => ({title, text, starter: "ans = ", solution, hint});
+const QUESTIONS = [
+  // 統計量(合計値・平均値・最頻値)
+  Q("数学の合計値", "「数学」列の合計値を求め、ans に代入してください。", "ans = df['数学'].sum()", "Series には sum() というメソッドがあります。"),
+  Q("数学の平均値", "「数学」列の平均値を求め、ans に代入してください。", "ans = df['数学'].mean()", "mean() を使います。"),
+  Q("数学の最頻値", "「数学」列の最頻値(いちばん多く出る点数)を、数値1つで ans に代入してください。", "ans = df['数学'].mode()[0]", "mode() は Series で返ります。先頭の要素を [0] で取り出します。"),
+  Q("教科ごとの合計値", "国語・数学・英語それぞれの合計値を、Series で ans に代入してください。欠損値は無視されます。", "ans = df[['国語','数学','英語']].sum()", "df[['国語','数学','英語']] で3列を選んでから sum() します。"),
+  Q("教科ごとの平均値", "国語・数学・英語それぞれの平均値を、Series で ans に代入してください。", "ans = df[['国語','数学','英語']].mean()"),
+  Q("一人ひとりの平均点", "生徒ごとの3教科(国語・数学・英語)の平均点を、Series で ans に代入してください。", "ans = df[['国語','数学','英語']].mean(axis=1)", "axis=1 を指定すると、行方向(横)に計算します。"),
+  // 範囲の抽出(head・tail・loc・iloc)
+  Q("先頭の3行", "データの先頭3行を取り出し、ans に代入してください。", "ans = df.head(3)", "head() の引数に行数を渡します。"),
+  Q("末尾の2行", "データの末尾2行を取り出し、ans に代入してください。", "ans = df.tail(2)"),
+  Q("行ラベルで範囲を指定", "loc を使って、行ラベル(index)が1から3までの行を取り出し、ans に代入してください。", "ans = df.loc[1:3]", "loc のスライスは、終わりの 3 も含まれます。"),
+  Q("列を指定して抽出", "loc を使って、すべての行から「名前」と「数学」の2列だけを取り出し、ans に代入してください。", "ans = df.loc[:, ['名前','数学']]", "df.loc[行の指定, 列の指定] の形です。すべての行は : と書きます。"),
+  Q("行と列の範囲指定", "loc を使って、行ラベル2から5までの行、列は「名前」から「数学」までを取り出し、ans に代入してください。", "ans = df.loc[2:5, '名前':'数学']", "列もスライスで '名前':'数学' のように指定できます。"),
+  Q("条件と列を組み合わせる", "loc を使って、数学が80点以上の生徒について「名前」と「数学」の列を取り出し、ans に代入してください。", "ans = df.loc[df['数学'] >= 80, ['名前','数学']]", "行の指定に条件式 df['数学'] >= 80 を入れます。"),
+  Q("位置で範囲を指定", "iloc を使って、先頭の2行・先頭の3列を取り出し、ans に代入してください。", "ans = df.iloc[:2, :3]", "iloc は位置(0始まりの番号)で指定します。終わりの番号は含まれません。"),
+  // 欠損値
+  Q("欠損値の数", "列ごとの欠損値の数を求め、ans に代入してください。", "ans = df.isnull().sum()", "isnull() の結果を sum() すると True の数が数えられます。"),
+  Q("欠損値の補完", "「英語」列の欠損値をその列の平均値で埋めた Series を ans に代入してください。", "ans = df['英語'].fillna(df['英語'].mean())", "fillna() の引数に平均値を渡します。"),
+  // クロス集計
+  Q("クロス集計(人数)", "行を「性別」、列を「クラス」として、人数のクロス集計表を作り、ans に代入してください。", "ans = pd.crosstab(df['性別'], df['クラス'])", "pd.crosstab(行にする列, 列にする列) を使います。"),
+  Q("性別×教科(平均値)", "性別ごとに、国語・数学・英語の平均値を求めた表(行が性別、列が教科)を ans に代入してください。", "ans = df.groupby('性別')[['国語','数学','英語']].mean()", "groupby('性別') のあと、3列を選んで mean() します。"),
+  Q("性別×教科(合計値)", "性別ごとに、国語・数学・英語の合計値を求めた表(行が性別、列が教科)を ans に代入してください。", "ans = df.groupby('性別')[['国語','数学','英語']].sum()"),
+  Q("ピボットテーブルで性別×教科", "pd.pivot_table を使って、行が性別、列が教科(国語・数学・英語)の平均値の表を ans に代入してください。", "ans = pd.pivot_table(df, index='性別', values=['国語','数学','英語'], aggfunc='mean')", "index に行にする列、values に集計する列(複数可)、aggfunc に集計方法を指定します。"),
+  Q("縦持ちに変換して性別×教科", "df.melt で、教科の列を「教科」「点数」の2列に縦長に変換し、それを使って pd.crosstab で行が性別、列が教科の平均点の表を ans に代入してください。", "long = df.melt(id_vars='性別', value_vars=['国語','数学','英語'], var_name='教科', value_name='点数')\nans = pd.crosstab(long['性別'], long['教科'], values=long['点数'], aggfunc='mean')", "melt の引数 id_vars・value_vars・var_name・value_name を使います。crosstab には values と aggfunc を渡すと、人数以外の集計もできます。"),
+];
+
+const GRADER = `
+import json, io, contextlib, traceback
+import pandas as pd, numpy as np
+
+def grade(setup, solution, code):
+    base = {"pd": pd, "np": np}
+    exec(setup, base)
+    exp = {"pd": pd, "np": np, "df": base["df"].copy()}
+    exec(solution, exp)
+    ns = {"pd": pd, "np": np, "df": base["df"].copy()}
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            exec(code, ns)
+    except Exception:
+        return json.dumps({"ok": False, "msg": "エラー: " + traceback.format_exc().splitlines()[-1], "out": buf.getvalue()}, ensure_ascii=False)
+    if "ans" not in ns or isinstance(ns["ans"], str) and ns["ans"] == "":
+        return json.dumps({"ok": False, "msg": "変数 ans に答えを代入してください", "out": buf.getvalue()}, ensure_ascii=False)
+    a, e = ns["ans"], exp["ans"]
+    try:
+        if isinstance(e, pd.DataFrame):
+            pd.testing.assert_frame_equal(a, e, check_dtype=False, check_names=False, check_like=True)
+        elif isinstance(e, pd.Series):
+            pd.testing.assert_series_equal(a, e, check_dtype=False, check_names=False)
+        else:
+            assert np.isclose(float(a), float(e))
+        return json.dumps({"ok": True, "msg": "正解です", "out": buf.getvalue()}, ensure_ascii=False)
+    except Exception:
+        return json.dumps({"ok": False, "msg": "答えが違います。ans の中身を print して確認してみましょう。", "out": buf.getvalue()}, ensure_ascii=False)
+`;
+
+const results = {};
+let pyodide, grade, dfText = "";
+const quiz = document.getElementById("quiz");
+
+QUESTIONS.forEach((q, i) => {
+  const d = document.createElement("section");
+  d.className = "q";
+  d.innerHTML = `<h2></h2><p></p>
+    <textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <button disabled>採点</button><details class="hint"><summary>ヒント</summary><p class="hp"></p></details><div class="res"></div><div class="out"></div>`;
+  d.querySelector("h2").textContent = `問${i + 1}. ${q.title}`;
+  d.querySelector("p").textContent = q.text;
+  d.querySelector("textarea").value = q.starter;
+  if (q.hint) d.querySelector(".hp").textContent = q.hint; else d.querySelector("details").remove();
+  d.querySelector("textarea").addEventListener("keydown", e => {
+    if (e.key === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "    "); }
+  });
+  d.querySelector("button").addEventListener("click", () => run(i, d));
+  quiz.appendChild(d);
+});
+
+async function run(i, d) {
+  const btn = d.querySelector("button");
+  btn.disabled = true;
+  let r;
+  try {
+    r = JSON.parse(grade(SETUP, QUESTIONS[i].solution, d.querySelector("textarea").value));
+  } catch (err) {
+    r = {ok: false, msg: "採点中にエラーが起きました", out: ""};
+  }
+  const res = d.querySelector("div.res");
+  res.textContent = r.msg;
+  res.className = "res " + (r.ok ? "ok" : "ng");
+  d.querySelector(".out").textContent = r.out;
+  results[i] = r.ok;
+  btn.disabled = false;
+}
+
+document.getElementById("finish").addEventListener("click", () => {
+  const total = QUESTIONS.length;
+  const n = Object.values(results).filter(Boolean).length;
+  const score = Math.round(n * 100 / total);
+  const todo = [], wrong = [];
+  QUESTIONS.forEach((_, i) => { if (results[i] === undefined) todo.push(i + 1); else if (!results[i]) wrong.push(i + 1); });
+  const box = document.getElementById("score");
+  box.innerHTML = '<div class="big"></div><div class="detail"></div>';
+  box.querySelector(".big").textContent = `${score} 点 / 100点`;
+  const lines = [`正解 ${n} / ${total} 問`];
+  if (wrong.length) lines.push("不正解: " + wrong.map(x => "問" + x).join("、"));
+  if (todo.length) lines.push("未採点: " + todo.map(x => "問" + x).join("、"));
+  box.querySelector(".detail").textContent = lines.join("\n");
+});
+
+(async () => {
+  try {
+    pyodide = await loadPyodide();
+    await pyodide.loadPackage("pandas");
+    await pyodide.runPythonAsync(GRADER);
+    grade = pyodide.globals.get("grade");
+    dfText = await pyodide.runPythonAsync(`
+import pandas as pd
+ns = {"pd": pd}
+exec(${JSON.stringify(SETUP)}, ns)
+ns["df"].to_string()
+`);
+    document.querySelectorAll("pre.data").forEach(p => p.textContent = "df =\n" + dfText);
+    document.querySelectorAll("button").forEach(b => b.disabled = false);
+    document.getElementById("status").textContent = "準備ができました。";
+  } catch (e) {
+    document.getElementById("status").textContent = "読み込みに失敗しました。ネットワークを確認して、ページを再読み込みしてください。";
+  }
+})();
+</script>
+</body>
+</html>
